@@ -1,0 +1,14 @@
+{
+  "name": "ws-server",
+  "version": "1.0.0",
+  "description": "Servidor websocket para comunicar com ESP32",
+  "author": "Marcelão é o isquerão",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

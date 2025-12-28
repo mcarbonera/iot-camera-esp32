@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 RGB Stream</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      width: 640px;
+      height: 384px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border: 2px solid #0f0;
+    }
+
+    .hud {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    
+    .hud button {
+      margin-left: 10px;
+      background: #000;
+      color: #0f0;
+      border: 1px solid #0f0;
+      font-family: monospace;
+      cursor: pointer;
+    }
+
+    .hud button:hover {
+      background: #0f0;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="canvas"></canvas>
+  <pre id="ascii"
+    style="
+      display:none;
+      color:#0f0;
+      background:#000;
+      font-family: monospace;
+      font-size: 8px;
+      line-height: 8px;
+      white-space: pre;
+      border: 2px solid #0f0;
+      padding: 4px;
+    ">
+  </pre>
+  <div class="hud">
+    <span id="hudText">Conectando...</span>
+    <button id="toggleBtn">ASCII</button>
+  </div>
+
+  <script>
+    const WIDTH = 160;
+    const HEIGHT = 96;
+    const BYTES_PER_PIXEL = 2;
+    const FRAME_SIZE = WIDTH * HEIGHT * BYTES_PER_PIXEL;
+
+    const canvas = document.getElementById("canvas");
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+    const asciiEl = document.getElementById("ascii");
+    
+    const hudText = document.getElementById("hudText");
+    const toggleBtn = document.getElementById("toggleBtn");
+    let currentMode = "BIN"; // BIN | ASCII
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const imageData = ctx.createImageData(WIDTH, HEIGHT);
+    const pixels = imageData.data;
+
+    const hud = document.getElementById("hud");
+
+    let frameCount = 0;
+    let lastTime = performance.now();
+
+    const ws = new WebSocket(`ws://${location.host}`);
+    ws.binaryType = "arraybuffer";
+
+    toggleBtn.onclick = () => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+
+      if (currentMode === "BIN") {
+        ws.send("ASCII_ON");
+        currentMode = "ASCII";
+        toggleBtn.textContent = "VÍDEO";
+      } else {
+        ws.send("ASCII_OFF");
+        currentMode = "BIN";
+        toggleBtn.textContent = "ASCII";
+      }
+    };
+
+    ws.onopen = () => {
+      hud.textContent = "Conectado";
+    };
+
+    ws.onclose = () => {
+      hud.textContent = "Desconectado";
+    };
+
+    ws.onerror = () => {
+      hud.textContent = "Erro no WebSocket";
+    };
+
+    ws.onmessage = (event) => {
+      // === MENSAGEM TEXTO (ASCII) ===
+      if (typeof event.data === "string") {
+        canvas.style.display = "none";
+        asciiEl.style.display = "block";
+
+        currentMode = "ASCII";
+        toggleBtn.textContent = "VÍDEO";
+
+        asciiEl.textContent = event.data;
+        return;
+      }
+
+      // === MENSAGEM BINÁRIA (RGB565) ===
+      const buffer = new Uint8Array(event.data);
+
+      if (buffer.length !== FRAME_SIZE) {
+        console.warn("Frame com tamanho inesperado:", buffer.length);
+        return;
+      }
+
+      if (currentMode !== "BIN") {
+        asciiEl.style.display = "none";
+        canvas.style.display = "block";
+        currentMode = "BIN";
+        toggleBtn.textContent = "ASCII";
+      }
+
+      let p = 0;
+
+      for (let i = 0; i < buffer.length; i += 2) {
+        // Little Endian
+        //const value = buffer[i] | (buffer[i + 1] << 8);
+        // Big Endian
+        const value = (buffer[i] << 8) | buffer[i + 1];
+
+        // RGB565 → RGB888
+        const r = (value >> 11) & 0x1F;
+        const g = (value >> 5) & 0x3F;
+        const b = value & 0x1F;
+
+        pixels[p++] = (r * 255) / 31;
+        pixels[p++] = (g * 255) / 63;
+        pixels[p++] = (b * 255) / 31;
+        pixels[p++] = 255;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        hudText.textContent =
+          `FPS: ${frameCount} | ${currentMode === "ASCII" ? "ASCII" : "VÍDEO"}`;
+        frameCount = 0;
+        lastTime = now;
+      }
+    };
+  </script>
+
+</body>
+</html>
