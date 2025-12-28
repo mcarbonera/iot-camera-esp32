@@ -7,6 +7,10 @@ Trabalho final da disciplina de Introdução ao Desenvolvimento para IOT da Espe
 - Página html para ver as imagens.
 - Comandos enviados ao ESP32 para modificar a imagem para ASCII.
 
+# Demonstração
+
+https://www.youtube.com/watch?v=N68sUa_L8xU
+
 # Para rodar:
 
 - Na pasta ws-server, executar com:
